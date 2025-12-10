@@ -172,21 +172,20 @@
             transform: translateX(-50%);
         }
 
-        .label-left, .label-right {
-            writing-mode: vertical-lr;
-            text-orientation: mixed;
-        }
-
         .label-left {
             left: 1rem;
             top: 50%;
-            transform: translateY(-50%) rotate(180deg);
+            transform: translateY(-50%);
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
         }
 
         .label-right {
             right: 1rem;
             top: 50%;
             transform: translateY(-50%);
+            writing-mode: vertical-lr;
+            text-orientation: mixed;
         }
 
         /* Interactive layer */
