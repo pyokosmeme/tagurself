@@ -69,16 +69,22 @@
 
         .compass-wrapper {
             position: relative;
-            width: min(80vmin, 700px);
-            height: min(80vmin, 700px);
+            padding: 3.5rem;
+            background: var(--bg-primary);
+            border-radius: 12px;
+        }
+        
+        .compass-inner {
+            position: relative;
+            width: min(70vmin, 600px);
+            height: min(70vmin, 600px);
         }
 
         .compass-container {
-            position: relative;
-            width: 100%;
-            height: 100%;
+            position: absolute;
+            inset: 0;
             border-radius: 8px;
-            overflow: hidden;
+            overflow: visible;
             box-shadow: 
                 0 0 0 1px var(--border),
                 0 25px 50px -12px rgba(0, 0, 0, 0.5);
@@ -90,6 +96,8 @@
             display: grid;
             grid-template-columns: repeat(6, 1fr);
             grid-template-rows: repeat(6, 1fr);
+            border-radius: 8px;
+            overflow: hidden;
         }
 
         .compass-cell {
@@ -140,40 +148,39 @@
         .axis-label {
             position: absolute;
             font-weight: 600;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             color: var(--text-primary);
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.12em;
             white-space: nowrap;
             z-index: 10;
-            text-shadow: 
-                0 1px 3px rgba(0,0,0,0.8),
-                0 0 20px rgba(0,0,0,0.5);
             pointer-events: none;
         }
 
         .label-top {
-            top: -2rem;
+            top: 0.75rem;
             left: 50%;
             transform: translateX(-50%);
         }
 
         .label-bottom {
-            bottom: -2rem;
+            bottom: 0.75rem;
             left: 50%;
             transform: translateX(-50%);
         }
 
         .label-left {
-            left: -2rem;
+            left: 0.75rem;
             top: 50%;
-            transform: translateY(-50%) rotate(-90deg);
+            transform: translateY(-50%) rotate(180deg);
+            writing-mode: vertical-rl;
         }
 
         .label-right {
-            right: -2rem;
+            right: 0.75rem;
             top: 50%;
-            transform: translateY(-50%) rotate(90deg);
+            transform: translateY(-50%);
+            writing-mode: vertical-rl;
         }
 
         /* Interactive layer */
@@ -762,11 +769,13 @@
                 <span class="axis-label label-left">Can Read</span>
                 <span class="axis-label label-right">Can't Read</span>
                 
-                <div class="compass-container" id="compass">
-                    <div class="compass-grid" id="compassGrid"></div>
-                    <div class="axis-h"></div>
-                    <div class="axis-v"></div>
-                    <div class="compass-interactive" id="compassInteractive"></div>
+                <div class="compass-inner">
+                    <div class="compass-container" id="compass">
+                        <div class="compass-grid" id="compassGrid"></div>
+                        <div class="axis-h"></div>
+                        <div class="axis-v"></div>
+                        <div class="compass-interactive" id="compassInteractive"></div>
+                    </div>
                 </div>
             </div>
         </main>
