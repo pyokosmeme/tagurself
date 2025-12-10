@@ -1,0 +1,1507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Political Compass Mapper</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --bg-primary: #0a0a0b;
+            --bg-secondary: #141416;
+            --bg-tertiary: #1c1c1f;
+            --text-primary: #f5f5f7;
+            --text-secondary: #a1a1a6;
+            --text-muted: #6e6e73;
+            --accent: #3b82f6;
+            --accent-hover: #60a5fa;
+            --border: #2a2a2e;
+            --danger: #ef4444;
+            
+            /* Compass quadrant colors */
+            --quad-tl: rgba(239, 68, 68, 0.4);
+            --quad-tr: rgba(59, 130, 246, 0.4);
+            --quad-bl: rgba(34, 197, 94, 0.4);
+            --quad-br: rgba(234, 179, 8, 0.4);
+        }
+
+        body {
+            font-family: 'Instrument Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .app-container {
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            min-height: 100vh;
+            gap: 0;
+        }
+
+        @media (max-width: 1024px) {
+            .app-container {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto 1fr auto;
+            }
+        }
+
+        /* Main Compass Area */
+        .compass-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            background: var(--bg-primary);
+            position: relative;
+        }
+
+        .compass-wrapper {
+            position: relative;
+            width: min(80vmin, 700px);
+            height: min(80vmin, 700px);
+        }
+
+        .compass-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 
+                0 0 0 1px var(--border),
+                0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .compass-grid {
+            position: absolute;
+            inset: 0;
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            grid-template-rows: repeat(6, 1fr);
+        }
+
+        .compass-cell {
+            border: 1px solid rgba(0, 0, 0, 0.15);
+        }
+
+        /* Generate gradient cells */
+        .compass-grid {
+            background: 
+                linear-gradient(to right, var(--quad-tl), var(--quad-tr)) 0 0 / 100% 50%,
+                linear-gradient(to right, var(--quad-bl), var(--quad-br)) 0 100% / 100% 50%;
+            background-repeat: no-repeat;
+        }
+
+        .compass-cell:nth-child(-n+18) {
+            background: linear-gradient(
+                to right,
+                hsla(0, 80%, calc(75% - var(--row) * 5%), calc(0.5 - var(--col) * 0.07)),
+                hsla(210, 80%, calc(75% - var(--row) * 5%), calc(0.5 - (5 - var(--col)) * 0.07))
+            );
+        }
+
+        /* Axis lines */
+        .axis-h, .axis-v {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 5;
+            pointer-events: none;
+        }
+
+        .axis-h {
+            left: 0;
+            right: 0;
+            top: 50%;
+            height: 2px;
+            transform: translateY(-50%);
+        }
+
+        .axis-v {
+            top: 0;
+            bottom: 0;
+            left: 50%;
+            width: 2px;
+            transform: translateX(-50%);
+        }
+
+        /* Labels */
+        .axis-label {
+            position: absolute;
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: var(--text-primary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            white-space: nowrap;
+            z-index: 10;
+            text-shadow: 
+                0 1px 3px rgba(0,0,0,0.8),
+                0 0 20px rgba(0,0,0,0.5);
+            pointer-events: none;
+        }
+
+        .label-top {
+            top: -2rem;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .label-bottom {
+            bottom: -2rem;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .label-left {
+            left: -2rem;
+            top: 50%;
+            transform: translateY(-50%) rotate(-90deg);
+        }
+
+        .label-right {
+            right: -2rem;
+            top: 50%;
+            transform: translateY(-50%) rotate(90deg);
+        }
+
+        /* Interactive layer */
+        .compass-interactive {
+            position: absolute;
+            inset: 0;
+            z-index: 20;
+            cursor: crosshair;
+        }
+
+        /* PFP Markers */
+        .pfp-marker {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            cursor: grab;
+            z-index: 30;
+            transition: transform 0.1s ease, box-shadow 0.2s ease;
+        }
+
+        .pfp-marker:active {
+            cursor: grabbing;
+        }
+
+        .pfp-marker.selected {
+            z-index: 40;
+        }
+
+        .pfp-marker.selected .pfp-image {
+            box-shadow: 
+                0 0 0 3px var(--accent),
+                0 4px 20px rgba(59, 130, 246, 0.4);
+        }
+
+        .pfp-image {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid rgba(255, 255, 255, 0.9);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            background: var(--bg-tertiary);
+            transition: box-shadow 0.2s ease;
+        }
+
+        .pfp-marker:hover .pfp-image {
+            box-shadow: 
+                0 0 0 2px rgba(255, 255, 255, 0.5),
+                0 4px 15px rgba(0, 0, 0, 0.4);
+        }
+
+        .pfp-label {
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.7rem;
+            font-weight: 500;
+            color: var(--text-primary);
+            background: rgba(0, 0, 0, 0.75);
+            padding: 2px 6px;
+            border-radius: 4px;
+            white-space: nowrap;
+            max-width: 100px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            opacity: 0;
+            transition: opacity 0.2s;
+            pointer-events: none;
+        }
+
+        .pfp-marker:hover .pfp-label,
+        .pfp-marker.selected .pfp-label {
+            opacity: 1;
+        }
+
+        /* Gaussian Error Ellipse */
+        .error-ellipse {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: -1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .error-ellipse-inner {
+            position: absolute;
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .error-ellipse-1 {
+            opacity: 0.5;
+            border: 2px solid;
+        }
+
+        .error-ellipse-2 {
+            opacity: 0.25;
+            border: 2px dashed;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        @media (max-width: 1024px) {
+            .sidebar {
+                height: auto;
+                border-left: none;
+                border-top: 1px solid var(--border);
+            }
+        }
+
+        .sidebar-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .sidebar-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .sidebar-subtitle {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .sidebar-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .section-title {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.6rem 1rem;
+            font-size: 0.85rem;
+            font-weight: 500;
+            font-family: inherit;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            width: 100%;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border);
+        }
+
+        .btn-danger {
+            background: transparent;
+            color: var(--danger);
+            border: 1px solid var(--danger);
+        }
+
+        .btn-danger:hover {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .btn-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+        }
+
+        /* Form inputs */
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 0.4rem;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 0.6rem 0.75rem;
+            font-size: 0.85rem;
+            font-family: inherit;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            transition: border-color 0.15s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .form-input::placeholder {
+            color: var(--text-muted);
+        }
+
+        /* Range slider */
+        .range-container {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .range-input {
+            flex: 1;
+            -webkit-appearance: none;
+            height: 4px;
+            background: var(--border);
+            border-radius: 2px;
+            cursor: pointer;
+        }
+
+        .range-input::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            background: var(--accent);
+            border-radius: 50%;
+            cursor: pointer;
+            transition: transform 0.1s ease;
+        }
+
+        .range-input::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+        }
+
+        .range-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            min-width: 2.5rem;
+            text-align: right;
+        }
+
+        /* Marker list */
+        .marker-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .marker-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.6rem;
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.15s ease;
+            border: 1px solid transparent;
+        }
+
+        .marker-item:hover {
+            background: var(--border);
+        }
+
+        .marker-item.selected {
+            border-color: var(--accent);
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        .marker-item-img {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            object-fit: cover;
+            background: var(--bg-secondary);
+        }
+
+        .marker-item-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .marker-item-name {
+            font-size: 0.85rem;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .marker-item-coords {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+        }
+
+        .marker-item-delete {
+            padding: 0.3rem;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.15s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .marker-item-delete:hover {
+            color: var(--danger);
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 2rem 1rem;
+            color: var(--text-muted);
+        }
+
+        .empty-state-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            opacity: 0.5;
+        }
+
+        .empty-state-text {
+            font-size: 0.85rem;
+        }
+
+        /* Hidden file input */
+        .hidden-input {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 1.5rem;
+            width: 90%;
+            max-width: 400px;
+            border: 1px solid var(--border);
+            transform: scale(0.95);
+            transition: transform 0.2s ease;
+        }
+
+        .modal-overlay.active .modal {
+            transform: scale(1);
+        }
+
+        .modal-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .modal-actions .btn {
+            flex: 1;
+        }
+
+        /* Textarea for JSON */
+        .json-textarea {
+            width: 100%;
+            height: 200px;
+            padding: 0.75rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            resize: vertical;
+        }
+
+        .json-textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        /* Toast notifications */
+        .toast-container {
+            position: fixed;
+            bottom: 1.5rem;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1100;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .toast {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            padding: 0.75rem 1.25rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--border);
+            animation: toastIn 0.3s ease, toastOut 0.3s ease 2.7s forwards;
+        }
+
+        @keyframes toastIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes toastOut {
+            to {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+        }
+
+        /* Checkbox toggle */
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+        }
+
+        .toggle-label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .toggle {
+            position: relative;
+            width: 40px;
+            height: 22px;
+            background: var(--border);
+            border-radius: 11px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .toggle.active {
+            background: var(--accent);
+        }
+
+        .toggle::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 18px;
+            height: 18px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.2s ease;
+        }
+
+        .toggle.active::after {
+            transform: translateX(18px);
+        }
+
+        /* Instructions */
+        .instructions {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+            padding: 0.75rem;
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+            margin-top: 0.5rem;
+        }
+
+        /* Color picker */
+        .color-picker-container {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .color-picker {
+            width: 32px;
+            height: 32px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            background: none;
+            padding: 0;
+        }
+
+        .color-picker::-webkit-color-swatch-wrapper {
+            padding: 0;
+        }
+
+        .color-picker::-webkit-color-swatch {
+            border: 2px solid var(--border);
+            border-radius: 6px;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <main class="compass-area">
+            <div class="compass-wrapper">
+                <span class="axis-label label-top">Operates in Good Faith</span>
+                <span class="axis-label label-bottom">Operates in Bad Faith</span>
+                <span class="axis-label label-left">Can Read</span>
+                <span class="axis-label label-right">Can't Read</span>
+                
+                <div class="compass-container" id="compass">
+                    <div class="compass-grid" id="compassGrid"></div>
+                    <div class="axis-h"></div>
+                    <div class="axis-v"></div>
+                    <div class="compass-interactive" id="compassInteractive"></div>
+                </div>
+            </div>
+        </main>
+
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1 class="sidebar-title">Compass Mapper</h1>
+                <p class="sidebar-subtitle">Click to place, drag to move</p>
+            </div>
+
+            <div class="sidebar-content">
+                <div class="sidebar-section">
+                    <h2 class="section-title">Add Marker</h2>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" id="addImageBtn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                <circle cx="8.5" cy="8.5" r="1.5"/>
+                                <polyline points="21 15 16 10 5 21"/>
+                            </svg>
+                            Upload Image
+                        </button>
+                        <input type="file" id="imageInput" class="hidden-input" accept="image/*">
+                    </div>
+                    <p class="instructions">Click anywhere on the compass to place your marker, then drag to reposition.</p>
+                </div>
+
+                <div class="sidebar-section" id="selectedMarkerSection" style="display: none;">
+                    <h2 class="section-title">Selected Marker</h2>
+                    <div class="form-group">
+                        <label class="form-label">Name</label>
+                        <input type="text" class="form-input" id="markerName" placeholder="Enter name...">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Error X (σ)</label>
+                        <div class="range-container">
+                            <input type="range" class="range-input" id="errorX" min="0" max="150" value="20">
+                            <span class="range-value" id="errorXValue">20%</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Error Y (σ)</label>
+                        <div class="range-container">
+                            <input type="range" class="range-input" id="errorY" min="0" max="150" value="20">
+                            <span class="range-value" id="errorYValue">20%</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Rotation Angle</label>
+                        <div class="range-container">
+                            <input type="range" class="range-input" id="errorAngle" min="-90" max="90" value="0">
+                            <span class="range-value" id="errorAngleValue">0°</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">1σ Color (68%)</label>
+                        <div class="color-picker-container">
+                            <input type="color" class="color-picker" id="errorColor1" value="#009c3b">
+                            <span class="form-label" style="margin: 0;">Inner ellipse</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">2σ Color (95%)</label>
+                        <div class="color-picker-container">
+                            <input type="color" class="color-picker" id="errorColor2" value="#ffdf00">
+                            <span class="form-label" style="margin: 0;">Outer ellipse</span>
+                        </div>
+                    </div>
+                    <div class="toggle-container">
+                        <span class="toggle-label">Show error ellipse</span>
+                        <div class="toggle active" id="showErrorToggle"></div>
+                    </div>
+                    <div style="margin-top: 1rem;">
+                        <button class="btn btn-danger" id="deleteMarkerBtn">Delete Marker</button>
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <h2 class="section-title">Markers</h2>
+                    <div class="marker-list" id="markerList">
+                        <div class="empty-state">
+                            <div class="empty-state-icon">📍</div>
+                            <p class="empty-state-text">No markers yet.<br>Click on compass to add one.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <h2 class="section-title">Import / Export</h2>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" id="exportPngBtn">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                <circle cx="8.5" cy="8.5" r="1.5"/>
+                                <polyline points="21 15 16 10 5 21"/>
+                            </svg>
+                            Export as PNG
+                        </button>
+                        <div class="btn-row">
+                            <button class="btn btn-secondary" id="exportBtn">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                    <polyline points="7 10 12 15 17 10"/>
+                                    <line x1="12" y1="15" x2="12" y2="3"/>
+                                </svg>
+                                JSON
+                            </button>
+                            <button class="btn btn-secondary" id="importBtn">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                    <polyline points="17 8 12 3 7 8"/>
+                                    <line x1="12" y1="3" x2="12" y2="15"/>
+                                </svg>
+                                Import
+                            </button>
+                        </div>
+                        <button class="btn btn-secondary" id="clearAllBtn">Clear All</button>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Import Modal -->
+    <div class="modal-overlay" id="importModal">
+        <div class="modal">
+            <h3 class="modal-title">Import Compass Data</h3>
+            <textarea class="json-textarea" id="importTextarea" placeholder="Paste JSON data here..."></textarea>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="cancelImport">Cancel</button>
+                <button class="btn btn-primary" id="confirmImport">Import</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Export Modal -->
+    <div class="modal-overlay" id="exportModal">
+        <div class="modal">
+            <h3 class="modal-title">Export Compass Data</h3>
+            <textarea class="json-textarea" id="exportTextarea" readonly></textarea>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="closeExport">Close</button>
+                <button class="btn btn-primary" id="copyExport">Copy to Clipboard</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        // State
+        let markers = [];
+        let selectedMarkerId = null;
+        let pendingImage = null;
+        let isDragging = false;
+        let dragOffset = { x: 0, y: 0 };
+
+        // DOM Elements
+        const compass = document.getElementById('compass');
+        const compassInteractive = document.getElementById('compassInteractive');
+        const compassGrid = document.getElementById('compassGrid');
+        const markerList = document.getElementById('markerList');
+        const imageInput = document.getElementById('imageInput');
+        const addImageBtn = document.getElementById('addImageBtn');
+        const selectedMarkerSection = document.getElementById('selectedMarkerSection');
+        const markerNameInput = document.getElementById('markerName');
+        const errorXInput = document.getElementById('errorX');
+        const errorYInput = document.getElementById('errorY');
+        const errorXValue = document.getElementById('errorXValue');
+        const errorYValue = document.getElementById('errorYValue');
+        const errorAngleInput = document.getElementById('errorAngle');
+        const errorAngleValue = document.getElementById('errorAngleValue');
+        const errorColorInput1 = document.getElementById('errorColor1');
+        const errorColorInput2 = document.getElementById('errorColor2');
+        const showErrorToggle = document.getElementById('showErrorToggle');
+        const deleteMarkerBtn = document.getElementById('deleteMarkerBtn');
+        const exportBtn = document.getElementById('exportBtn');
+        const exportPngBtn = document.getElementById('exportPngBtn');
+        const importBtn = document.getElementById('importBtn');
+        const clearAllBtn = document.getElementById('clearAllBtn');
+        const importModal = document.getElementById('importModal');
+        const exportModal = document.getElementById('exportModal');
+        const importTextarea = document.getElementById('importTextarea');
+        const exportTextarea = document.getElementById('exportTextarea');
+        const cancelImport = document.getElementById('cancelImport');
+        const confirmImport = document.getElementById('confirmImport');
+        const closeExport = document.getElementById('closeExport');
+        const copyExport = document.getElementById('copyExport');
+        const toastContainer = document.getElementById('toastContainer');
+
+        // Initialize compass grid cells
+        function initGrid() {
+            for (let row = 0; row < 6; row++) {
+                for (let col = 0; col < 6; col++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'compass-cell';
+                    
+                    // Calculate color based on position
+                    const xRatio = col / 5;
+                    const yRatio = row / 5;
+                    
+                    // Interpolate between quadrant colors
+                    const topColor = interpolateColor(
+                        { r: 248, g: 180, b: 180 }, // top-left (red/pink)
+                        { r: 147, g: 197, b: 253 }, // top-right (blue)
+                        xRatio
+                    );
+                    const bottomColor = interpolateColor(
+                        { r: 187, g: 247, b: 208 }, // bottom-left (green)
+                        { r: 254, g: 240, b: 138 }, // bottom-right (yellow)
+                        xRatio
+                    );
+                    const finalColor = interpolateColor(topColor, bottomColor, yRatio);
+                    
+                    cell.style.background = `rgb(${finalColor.r}, ${finalColor.g}, ${finalColor.b})`;
+                    compassGrid.appendChild(cell);
+                }
+            }
+        }
+
+        function interpolateColor(c1, c2, ratio) {
+            return {
+                r: Math.round(c1.r + (c2.r - c1.r) * ratio),
+                g: Math.round(c1.g + (c2.g - c1.g) * ratio),
+                b: Math.round(c1.b + (c2.b - c1.b) * ratio)
+            };
+        }
+
+        // Toast notification
+        function showToast(message) {
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = message;
+            toastContainer.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // Generate unique ID
+        function generateId() {
+            return 'marker_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+
+        // Create marker element
+        function createMarkerElement(marker) {
+            const el = document.createElement('div');
+            el.className = 'pfp-marker';
+            el.dataset.id = marker.id;
+            el.style.left = `${marker.x}%`;
+            el.style.top = `${marker.y}%`;
+
+            // Error ellipse container
+            if (marker.showError) {
+                const ellipseContainer = document.createElement('div');
+                ellipseContainer.className = 'error-ellipse';
+                ellipseContainer.style.transform = `translate(-50%, -50%) rotate(${marker.errorAngle || 0}deg)`;
+                
+                // 2σ ellipse (95%) - yellow by default
+                const ellipse2 = document.createElement('div');
+                ellipse2.className = 'error-ellipse-inner error-ellipse-2';
+                ellipse2.style.width = `${marker.errorX * 4}px`;
+                ellipse2.style.height = `${marker.errorY * 4}px`;
+                ellipse2.style.background = marker.errorColor2 || '#ffdf00';
+                ellipse2.style.borderColor = marker.errorColor2 || '#ffdf00';
+                ellipseContainer.appendChild(ellipse2);
+                
+                // 1σ ellipse (68%) - green by default
+                const ellipse1 = document.createElement('div');
+                ellipse1.className = 'error-ellipse-inner error-ellipse-1';
+                ellipse1.style.width = `${marker.errorX * 2}px`;
+                ellipse1.style.height = `${marker.errorY * 2}px`;
+                ellipse1.style.background = marker.errorColor1 || '#009c3b';
+                ellipse1.style.borderColor = marker.errorColor1 || '#009c3b';
+                ellipseContainer.appendChild(ellipse1);
+                
+                el.appendChild(ellipseContainer);
+            }
+
+            const img = document.createElement('img');
+            img.className = 'pfp-image';
+            img.src = marker.image;
+            img.alt = marker.name || 'Marker';
+            img.draggable = false;
+            el.appendChild(img);
+
+            if (marker.name) {
+                const label = document.createElement('span');
+                label.className = 'pfp-label';
+                label.textContent = marker.name;
+                el.appendChild(label);
+            }
+
+            // Event listeners
+            el.addEventListener('mousedown', (e) => startDrag(e, marker.id));
+            el.addEventListener('touchstart', (e) => startDrag(e, marker.id), { passive: false });
+            el.addEventListener('click', (e) => {
+                if (!isDragging) {
+                    e.stopPropagation();
+                    selectMarker(marker.id);
+                }
+            });
+
+            return el;
+        }
+
+        // Render all markers
+        function renderMarkers() {
+            // Remove old markers
+            document.querySelectorAll('.pfp-marker').forEach(el => el.remove());
+            
+            // Add markers
+            markers.forEach(marker => {
+                const el = createMarkerElement(marker);
+                if (marker.id === selectedMarkerId) {
+                    el.classList.add('selected');
+                }
+                compassInteractive.appendChild(el);
+            });
+
+            // Update list
+            renderMarkerList();
+        }
+
+        // Render marker list in sidebar
+        function renderMarkerList() {
+            if (markers.length === 0) {
+                markerList.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📍</div>
+                        <p class="empty-state-text">No markers yet.<br>Click on compass to add one.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            markerList.innerHTML = markers.map(marker => `
+                <div class="marker-item ${marker.id === selectedMarkerId ? 'selected' : ''}" data-id="${marker.id}">
+                    <img class="marker-item-img" src="${marker.image}" alt="${marker.name || 'Marker'}">
+                    <div class="marker-item-info">
+                        <div class="marker-item-name">${marker.name || 'Unnamed'}</div>
+                        <div class="marker-item-coords">(${(marker.x - 50).toFixed(1)}, ${(50 - marker.y).toFixed(1)})</div>
+                    </div>
+                    <button class="marker-item-delete" data-id="${marker.id}">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"/>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                        </svg>
+                    </button>
+                </div>
+            `).join('');
+
+            // Add click listeners
+            markerList.querySelectorAll('.marker-item').forEach(item => {
+                item.addEventListener('click', (e) => {
+                    if (!e.target.closest('.marker-item-delete')) {
+                        selectMarker(item.dataset.id);
+                    }
+                });
+            });
+
+            markerList.querySelectorAll('.marker-item-delete').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    deleteMarker(btn.dataset.id);
+                });
+            });
+        }
+
+        // Select marker
+        function selectMarker(id) {
+            selectedMarkerId = id;
+            const marker = markers.find(m => m.id === id);
+            
+            if (marker) {
+                selectedMarkerSection.style.display = 'block';
+                markerNameInput.value = marker.name || '';
+                errorXInput.value = marker.errorX || 20;
+                errorYInput.value = marker.errorY || 20;
+                errorAngleInput.value = marker.errorAngle || 0;
+                errorXValue.textContent = `${marker.errorX || 20}%`;
+                errorYValue.textContent = `${marker.errorY || 20}%`;
+                errorAngleValue.textContent = `${marker.errorAngle || 0}°`;
+                errorColorInput1.value = marker.errorColor1 || '#009c3b';
+                errorColorInput2.value = marker.errorColor2 || '#ffdf00';
+                showErrorToggle.classList.toggle('active', marker.showError !== false);
+            } else {
+                selectedMarkerSection.style.display = 'none';
+            }
+
+            renderMarkers();
+        }
+
+        // Deselect marker
+        function deselectMarker() {
+            selectedMarkerId = null;
+            selectedMarkerSection.style.display = 'none';
+            renderMarkers();
+        }
+
+        // Delete marker
+        function deleteMarker(id) {
+            markers = markers.filter(m => m.id !== id);
+            if (selectedMarkerId === id) {
+                deselectMarker();
+            }
+            renderMarkers();
+            showToast('Marker deleted');
+        }
+
+        // Add marker at position
+        function addMarker(x, y, imageData) {
+            const marker = {
+                id: generateId(),
+                x: x,
+                y: y,
+                image: imageData,
+                name: '',
+                errorX: 20,
+                errorY: 20,
+                errorAngle: 0,
+                errorColor1: '#009c3b',  // 1σ - Brazilian green
+                errorColor2: '#ffdf00',  // 2σ - Brazilian yellow
+                showError: true
+            };
+            markers.push(marker);
+            selectMarker(marker.id);
+            renderMarkers();
+            showToast('Marker added');
+        }
+
+        // Start dragging
+        function startDrag(e, markerId) {
+            e.preventDefault();
+            isDragging = false;
+            
+            const marker = markers.find(m => m.id === markerId);
+            if (!marker) return;
+
+            const rect = compassInteractive.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            
+            const startX = clientX;
+            const startY = clientY;
+
+            const onMove = (e) => {
+                const moveX = e.touches ? e.touches[0].clientX : e.clientX;
+                const moveY = e.touches ? e.touches[0].clientY : e.clientY;
+                
+                if (Math.abs(moveX - startX) > 3 || Math.abs(moveY - startY) > 3) {
+                    isDragging = true;
+                }
+
+                if (isDragging) {
+                    const x = ((moveX - rect.left) / rect.width) * 100;
+                    const y = ((moveY - rect.top) / rect.height) * 100;
+                    
+                    marker.x = Math.max(0, Math.min(100, x));
+                    marker.y = Math.max(0, Math.min(100, y));
+                    
+                    const el = document.querySelector(`.pfp-marker[data-id="${markerId}"]`);
+                    if (el) {
+                        el.style.left = `${marker.x}%`;
+                        el.style.top = `${marker.y}%`;
+                    }
+                }
+            };
+
+            const onEnd = () => {
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onEnd);
+                document.removeEventListener('touchmove', onMove);
+                document.removeEventListener('touchend', onEnd);
+                
+                if (isDragging) {
+                    renderMarkerList();
+                }
+                
+                setTimeout(() => isDragging = false, 10);
+            };
+
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onEnd);
+            document.addEventListener('touchmove', onMove, { passive: false });
+            document.addEventListener('touchend', onEnd);
+        }
+
+        // Handle compass click
+        compassInteractive.addEventListener('click', (e) => {
+            if (e.target !== compassInteractive) return;
+            
+            const rect = compassInteractive.getBoundingClientRect();
+            const x = ((e.clientX - rect.left) / rect.width) * 100;
+            const y = ((e.clientY - rect.top) / rect.height) * 100;
+
+            if (pendingImage) {
+                addMarker(x, y, pendingImage);
+                pendingImage = null;
+                addImageBtn.textContent = 'Upload Image';
+                addImageBtn.innerHTML = `
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                        <circle cx="8.5" cy="8.5" r="1.5"/>
+                        <polyline points="21 15 16 10 5 21"/>
+                    </svg>
+                    Upload Image
+                `;
+            } else {
+                deselectMarker();
+            }
+        });
+
+        // Image upload
+        addImageBtn.addEventListener('click', () => imageInput.click());
+        
+        imageInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                pendingImage = event.target.result;
+                addImageBtn.innerHTML = `
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="8" x2="12" y2="16"/>
+                        <line x1="8" y1="12" x2="16" y2="12"/>
+                    </svg>
+                    Click on compass to place
+                `;
+                showToast('Click on the compass to place marker');
+            };
+            reader.readAsDataURL(file);
+            imageInput.value = '';
+        });
+
+        // Marker controls
+        markerNameInput.addEventListener('input', (e) => {
+            const marker = markers.find(m => m.id === selectedMarkerId);
+            if (marker) {
+                marker.name = e.target.value;
+                renderMarkers();
+            }
+        });
+
+        errorXInput.addEventListener('input', (e) => {
+            const marker = markers.find(m => m.id === selectedMarkerId);
+            if (marker) {
+                marker.errorX = parseInt(e.target.value);
+                errorXValue.textContent = `${marker.errorX}%`;
+                renderMarkers();
+            }
+        });
+
+        errorYInput.addEventListener('input', (e) => {
+            const marker = markers.find(m => m.id === selectedMarkerId);
+            if (marker) {
+                marker.errorY = parseInt(e.target.value);
+                errorYValue.textContent = `${marker.errorY}%`;
+                renderMarkers();
+            }
+        });
+
+        errorAngleInput.addEventListener('input', (e) => {
+            const marker = markers.find(m => m.id === selectedMarkerId);
+            if (marker) {
+                marker.errorAngle = parseInt(e.target.value);
+                errorAngleValue.textContent = `${marker.errorAngle}°`;
+                renderMarkers();
+            }
+        });
+
+        errorColorInput1.addEventListener('input', (e) => {
+            const marker = markers.find(m => m.id === selectedMarkerId);
+            if (marker) {
+                marker.errorColor1 = e.target.value;
+                renderMarkers();
+            }
+        });
+
+        errorColorInput2.addEventListener('input', (e) => {
+            const marker = markers.find(m => m.id === selectedMarkerId);
+            if (marker) {
+                marker.errorColor2 = e.target.value;
+                renderMarkers();
+            }
+        });
+
+        showErrorToggle.addEventListener('click', () => {
+            const marker = markers.find(m => m.id === selectedMarkerId);
+            if (marker) {
+                marker.showError = !marker.showError;
+                showErrorToggle.classList.toggle('active', marker.showError);
+                renderMarkers();
+            }
+        });
+
+        deleteMarkerBtn.addEventListener('click', () => {
+            if (selectedMarkerId) {
+                deleteMarker(selectedMarkerId);
+            }
+        });
+
+        // Import/Export
+        exportBtn.addEventListener('click', () => {
+            const exportData = {
+                version: 1,
+                markers: markers.map(m => ({
+                    ...m,
+                    // Keep image data for full recreation
+                }))
+            };
+            exportTextarea.value = JSON.stringify(exportData, null, 2);
+            exportModal.classList.add('active');
+        });
+
+        // PNG Export
+        exportPngBtn.addEventListener('click', async () => {
+            const compassWrapper = document.querySelector('.compass-wrapper');
+            
+            // Temporarily deselect marker for cleaner export
+            const wasSelected = selectedMarkerId;
+            document.querySelectorAll('.pfp-marker.selected').forEach(el => el.classList.remove('selected'));
+            
+            try {
+                showToast('Generating PNG...');
+                const canvas = await html2canvas(compassWrapper, {
+                    backgroundColor: null,
+                    scale: 2, // Higher resolution
+                    useCORS: true,
+                    allowTaint: true,
+                    logging: false
+                });
+                
+                // Create download link
+                const link = document.createElement('a');
+                link.download = 'compass-' + new Date().toISOString().slice(0, 10) + '.png';
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+                
+                showToast('PNG exported successfully!');
+            } catch (error) {
+                console.error('Export failed:', error);
+                showToast('Export failed. Try again.');
+            }
+            
+            // Restore selection
+            if (wasSelected) {
+                const el = document.querySelector(`.pfp-marker[data-id="${wasSelected}"]`);
+                if (el) el.classList.add('selected');
+            }
+        });
+
+        importBtn.addEventListener('click', () => {
+            importTextarea.value = '';
+            importModal.classList.add('active');
+        });
+
+        cancelImport.addEventListener('click', () => {
+            importModal.classList.remove('active');
+        });
+
+        confirmImport.addEventListener('click', () => {
+            try {
+                const data = JSON.parse(importTextarea.value);
+                if (data.markers && Array.isArray(data.markers)) {
+                    markers = data.markers.map(m => ({
+                        ...m,
+                        id: m.id || generateId()
+                    }));
+                    deselectMarker();
+                    renderMarkers();
+                    showToast(`Imported ${markers.length} markers`);
+                    importModal.classList.remove('active');
+                } else {
+                    throw new Error('Invalid format');
+                }
+            } catch (e) {
+                showToast('Invalid JSON format');
+            }
+        });
+
+        closeExport.addEventListener('click', () => {
+            exportModal.classList.remove('active');
+        });
+
+        copyExport.addEventListener('click', () => {
+            navigator.clipboard.writeText(exportTextarea.value).then(() => {
+                showToast('Copied to clipboard');
+                exportModal.classList.remove('active');
+            });
+        });
+
+        clearAllBtn.addEventListener('click', () => {
+            if (markers.length === 0) return;
+            if (confirm('Clear all markers?')) {
+                markers = [];
+                deselectMarker();
+                renderMarkers();
+                showToast('All markers cleared');
+            }
+        });
+
+        // Close modals on overlay click
+        [importModal, exportModal].forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.remove('active');
+                }
+            });
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                importModal.classList.remove('active');
+                exportModal.classList.remove('active');
+                pendingImage = null;
+                addImageBtn.innerHTML = `
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                        <circle cx="8.5" cy="8.5" r="1.5"/>
+                        <polyline points="21 15 16 10 5 21"/>
+                    </svg>
+                    Upload Image
+                `;
+            }
+            if (e.key === 'Delete' && selectedMarkerId) {
+                deleteMarker(selectedMarkerId);
+            }
+        });
+
+        // Initialize
+        initGrid();
+        renderMarkers();
+    </script>
+</body>
+</html>
